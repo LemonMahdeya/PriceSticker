@@ -1,0 +1,38 @@
+name: Build EXE for Windows
+
+on:
+  push:
+    branches: [ "main" ] # سيعمل السكربت عند الرفع على فرع main
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest # استخدام نظام ويندوز لبناء ملف EXE متوافق
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10' # نسخة مستقرة وتعمل على معظم الأجهزة
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas openpyxl reportlab pyinstaller
+
+    - name: Build EXE with PyInstaller
+      run: |
+        # استبدل script_name.py باسم ملف البايثون الخاص بك
+        # --onefile: لدمج كل شيء في ملف واحد
+        # --noconsole: لعدم إظهار شاشة سوداء خلف البرنامج
+        pyinstaller --noconsole --onefile pricesticker.py
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Lemon-Pharmacy-App
+        path: dist/*.exe # الملف الناتج سيكون في مجلد dist
