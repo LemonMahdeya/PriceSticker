@@ -4,7 +4,6 @@ from tkinter import filedialog, messagebox
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
-import os
 
 class LemonLabelGenerator:
     def __init__(self, root):
@@ -26,65 +25,61 @@ class LemonLabelGenerator:
             return
 
         try:
+            # قراءة الإكسيل وتجاهل الصفوف الفارغة
             df = pd.read_excel(file_path).dropna(how='all')
             output_name = "Lemon_Stickers_Final.pdf"
             
-            # مقاس الاستيكر 60 مم عرض × 40 مم طول
-            sw = 60 * mm
-            sh = 40 * mm
-            
+            sw, sh = 60 * mm, 40 * mm # مقاس الاستيكر
             c = canvas.Canvas(output_name, pagesize=(sw, sh))
 
             for index, row in df.iterrows():
-                # استلام البيانات
                 intl_code = str(row.iloc[0])
                 ascon_code = str(row.iloc[1])
                 item_name = str(row.iloc[2])
                 tax_percent = float(row.iloc[3])
-                price_base = float(row.iloc[4])
+                price_input = float(row.iloc[4]) # السعر اللي أنت بتدخله (مثلاً 9)
 
-                # حساب السعر النهائي: السعر + (السعر * نسبة الضريبة)
-                final_price = price_base + (price_base * (tax_percent / 100))
-                price_num_str = "{:.2f}".format(final_price)
+                # المعادلة: 9 + (9 * 0.15) = 10.35
+                total_price = price_input + (price_input * (tax_percent / 100))
+                price_display = "{:.2f}".format(total_price)
 
-                # --- رسم التصميم ---
+                # --- التنفيذ الرسومي ---
                 
-                # 1. الاسم بالإنجليزي (فوق يسار مع خاصية التفاف النص)
+                # 1. الاسم (فوق يسار - سطرين)
                 c.setFont("Helvetica-Bold", 8)
-                lines = simpleSplit(item_name, "Helvetica-Bold", 8, sw - 10*mm)
-                y_text = sh - 6*mm
-                for line in lines[:2]: # السماح بسطرين فقط للاسم
-                    c.drawString(4*mm, y_text, line)
-                    y_text -= 3.5*mm
+                name_lines = simpleSplit(item_name, "Helvetica-Bold", 8, sw - 12*mm)
+                y_pos = sh - 5*mm
+                for line in name_lines[:2]:
+                    c.drawString(4*mm, y_pos, line)
+                    y_pos -= 3.2*mm
 
-                # 2. السعر في المنتصف (الرقم كبير)
-                c.setFont("Helvetica-Bold", 28)
-                num_width = c.stringWidth(price_num_str, "Helvetica-Bold", 28)
-                c.drawString((sw - num_width)/2 - 4*mm, sh/2 + 1*mm, price_num_str)
+                # 2. السعر (كبير في المنتصف)
+                c.setFont("Helvetica-Bold", 32)
+                p_width = c.stringWidth(price_display, "Helvetica-Bold", 32)
+                # حساب نقطة البداية لتوسيط السعر مع الـ S.R
+                start_x = (sw - p_width) / 2
+                c.drawString(start_x - 2*mm, sh/2 + 1*mm, price_display)
                 
-                # كلمة S.R بجانب السعر (خط صغير مثل الـ VAT)
-                c.setFont("Helvetica", 7)
-                c.drawString((sw - num_width)/2 + num_width - 3*mm, sh/2 + 1*mm, "S.R")
+                # S.R (صغيرة بجانب السعر) بنفس حجم الـ VAT
+                c.setFont("Helvetica", 8)
+                c.drawString(start_x + p_width + 1*mm, sh/2 + 1*mm, "S.R")
 
-                # 3. الضريبة (في الوسط على اليمين - خط صغير)
-                c.setFont("Helvetica", 7)
-                tax_str = f"{int(tax_percent)}% VAT"
-                c.drawRightString(sw - 4*mm, sh/2 + 1*mm, tax_str)
+                # 3. الضريبة (يمين المنتصف - خط صغير)
+                c.setFont("Helvetica", 8)
+                c.drawRightString(sw - 4*mm, sh/2 + 1*mm, f"{int(tax_percent)}% VAT")
 
-                # 4. الأكواد (INTERNATIONAL CODE / ASCON CODE) - خط أكبر و Bold
+                # 4. الأكواد (INTERNATIONAL / ASCON) - خط كبير وبولد
                 c.setFont("Helvetica-Bold", 10)
-                codes_text = f"{intl_code}   /   {ascon_code}"
-                c.drawCentredString(sw/2, sh/2 - 9*mm, codes_text)
+                c.drawCentredString(sw/2, sh/2 - 9*mm, f"{intl_code}   /   {ascon_code}")
 
-                # 5. التذييل (اسم المجموعة والموقع)
+                # 5. التذييل
                 c.setFont("Helvetica-Bold", 8)
-                footer_text = "Lemon pharmacy Group       www.lemon.sa"
-                c.drawCentredString(sw/2, 6*mm, footer_text)
+                c.drawCentredString(sw/2, 6*mm, "Lemon pharmacy Group       www.lemon.sa")
 
                 c.showPage()
 
             c.save()
-            messagebox.showinfo("Success", "PDF Stickers Created Successfully!")
+            messagebox.showinfo("Success", "Done! Check Lemon_Stickers_Final.pdf")
             
         except Exception as e:
             messagebox.showerror("Error", f"Error: {str(e)}")
