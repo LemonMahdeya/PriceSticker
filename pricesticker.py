@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from reportlab.lib.utils import simpleSplit
 import os
 
 class LemonLabelGenerator:
@@ -35,38 +36,47 @@ class LemonLabelGenerator:
             c = canvas.Canvas(output_name, pagesize=(sw, sh))
 
             for index, row in df.iterrows():
-                # استلام البيانات من الأعمدة
+                # استلام البيانات
                 intl_code = str(row.iloc[0])
                 ascon_code = str(row.iloc[1])
                 item_name = str(row.iloc[2])
-                tax_val = float(row.iloc[3])
-                price_raw = float(row.iloc[4])
+                tax_percent = float(row.iloc[3])
+                price_base = float(row.iloc[4])
 
-                # حساب السعر النهائي (السعر شامل الضريبة)
-                final_price = price_raw * (1 + (tax_val / 100))
-                price_text = "{:.2f} S.R".format(final_price)
+                # حساب السعر النهائي: السعر + (السعر * نسبة الضريبة)
+                final_price = price_base + (price_base * (tax_percent / 100))
+                price_num_str = "{:.2f}".format(final_price)
 
-                # --- رسم التصميم المطلوب ---
+                # --- رسم التصميم ---
                 
-                # 1. الاسم بالإنجليزي (فوق يسار)
+                # 1. الاسم بالإنجليزي (فوق يسار مع خاصية التفاف النص)
                 c.setFont("Helvetica-Bold", 8)
-                c.drawString(4*mm, sh - 6*mm, item_name[:45])
+                lines = simpleSplit(item_name, "Helvetica-Bold", 8, sw - 10*mm)
+                y_text = sh - 6*mm
+                for line in lines[:2]: # السماح بسطرين فقط للاسم
+                    c.drawString(4*mm, y_text, line)
+                    y_text -= 3.5*mm
 
-                # 2. السعر في المنتصف (كبير وبولد)
-                c.setFont("Helvetica-Bold", 26)
-                c.drawCentredString(sw/2, sh/2 + 2*mm, price_text)
+                # 2. السعر في المنتصف (الرقم كبير)
+                c.setFont("Helvetica-Bold", 28)
+                num_width = c.stringWidth(price_num_str, "Helvetica-Bold", 28)
+                c.drawString((sw - num_width)/2 - 4*mm, sh/2 + 1*mm, price_num_str)
+                
+                # كلمة S.R بجانب السعر (خط صغير مثل الـ VAT)
+                c.setFont("Helvetica", 7)
+                c.drawString((sw - num_width)/2 + num_width - 3*mm, sh/2 + 1*mm, "S.R")
 
                 # 3. الضريبة (في الوسط على اليمين - خط صغير)
                 c.setFont("Helvetica", 7)
-                tax_str = f"{int(tax_val)}% VAT"
-                c.drawRightString(sw - 4*mm, sh/2 + 2*mm, tax_str)
+                tax_str = f"{int(tax_percent)}% VAT"
+                c.drawRightString(sw - 4*mm, sh/2 + 1*mm, tax_str)
 
-                # 4. الأكواد (INTERNATIONAL CODE / ASCON CODE)
-                c.setFont("Helvetica", 8)
-                codes_text = f"{intl_code}     /    {ascon_code}"
-                c.drawCentredString(sw/2, sh/2 - 8*mm, codes_text)
+                # 4. الأكواد (INTERNATIONAL CODE / ASCON CODE) - خط أكبر و Bold
+                c.setFont("Helvetica-Bold", 10)
+                codes_text = f"{intl_code}   /   {ascon_code}"
+                c.drawCentredString(sw/2, sh/2 - 9*mm, codes_text)
 
-                # 5. التذييل (Lemon pharmacy Group       www.lemon.sa)
+                # 5. التذييل (اسم المجموعة والموقع)
                 c.setFont("Helvetica-Bold", 8)
                 footer_text = "Lemon pharmacy Group       www.lemon.sa"
                 c.drawCentredString(sw/2, 6*mm, footer_text)
