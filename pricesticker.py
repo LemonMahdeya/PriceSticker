@@ -38,8 +38,14 @@ class LemonLabelGenerator:
             c = canvas.Canvas(output_name, pagesize=(sw, sh))
 
             for index, row in df.iterrows():
-                intl_code = str(row.iloc[0])
-                ascon_code = str(row.iloc[1])
+                intl_code = str(row.iloc[0]).strip()
+
+                ascon_code = str(row.iloc[1]).strip()
+
+                # ✅ إضافة صفر في بداية ASCON Code لو مش موجود
+                if not ascon_code.startswith("0"):
+                    ascon_code = "0" + ascon_code
+
                 item_name = str(row.iloc[2])
                 tax_percent = float(row.iloc[3])
                 price_input = float(row.iloc[4])
@@ -66,7 +72,7 @@ class LemonLabelGenerator:
                 sr_y = sh / 2 + 1 * mm
                 c.drawString(sr_x, sr_y, "S.R")
 
-                # 3. VAT (أصغر وفوق S.R)
+                # VAT فوق S.R
                 c.setFont("Helvetica", 6)
                 c.drawString(sr_x, sr_y + 4 * mm, f"{int(tax_percent)}% VAT")
 
