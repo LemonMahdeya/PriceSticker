@@ -31,11 +31,10 @@ class LemonLabelGenerator:
             return
 
         try:
-            # قراءة الإكسيل وتجاهل الصفوف الفارغة
             df = pd.read_excel(file_path).dropna(how='all')
             output_name = "Lemon_Stickers_Final.pdf"
 
-            sw, sh = 60 * mm, 40 * mm  # مقاس الاستيكر
+            sw, sh = 60 * mm, 40 * mm
             c = canvas.Canvas(output_name, pagesize=(sw, sh))
 
             for index, row in df.iterrows():
@@ -43,14 +42,11 @@ class LemonLabelGenerator:
                 ascon_code = str(row.iloc[1])
                 item_name = str(row.iloc[2])
                 tax_percent = float(row.iloc[3])
-                price_input = float(row.iloc[4])  # السعر النهائي من الإكسيل
+                price_input = float(row.iloc[4])
 
-                # بدون أي حساب
                 price_display = "{:.2f}".format(price_input)
 
-                # --- التنفيذ الرسومي ---
-
-                # 1. الاسم (فوق يسار - سطرين)
+                # 1. الاسم
                 c.setFont("Helvetica-Bold", 8)
                 name_lines = simpleSplit(item_name, "Helvetica-Bold", 8, sw - 12 * mm)
                 y_pos = sh - 5 * mm
@@ -58,7 +54,7 @@ class LemonLabelGenerator:
                     c.drawString(4 * mm, y_pos, line)
                     y_pos -= 3.2 * mm
 
-                # 2. السعر (كبير في المنتصف)
+                # 2. السعر
                 c.setFont("Helvetica-Bold", 32)
                 p_width = c.stringWidth(price_display, "Helvetica-Bold", 32)
                 start_x = (sw - p_width) / 2
@@ -66,11 +62,13 @@ class LemonLabelGenerator:
 
                 # S.R
                 c.setFont("Helvetica", 8)
-                c.drawString(start_x + p_width + 1 * mm, sh / 2 + 1 * mm, "S.R")
+                sr_x = start_x + p_width + 1 * mm
+                sr_y = sh / 2 + 1 * mm
+                c.drawString(sr_x, sr_y, "S.R")
 
-                # 3. الضريبة (يمين المنتصف)
-                c.setFont("Helvetica", 8)
-                c.drawRightString(sw - 4 * mm, sh / 2 + 1 * mm, f"{int(tax_percent)}% VAT")
+                # 3. VAT (أصغر وفوق S.R)
+                c.setFont("Helvetica", 6)
+                c.drawString(sr_x, sr_y + 4 * mm, f"{int(tax_percent)}% VAT")
 
                 # 4. الأكواد
                 c.setFont("Helvetica-Bold", 10)
