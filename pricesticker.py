@@ -38,7 +38,12 @@ class LemonLabelGenerator:
             c = canvas.Canvas(output_name, pagesize=(sw, sh))
 
             for index, row in df.iterrows():
-                intl_code = str(row.iloc[0]).strip()
+                intl_code_raw = row.iloc[0]
+
+if pd.notna(intl_code_raw):
+    intl_code = str(int(intl_code_raw))
+else:
+    intl_code = ""
 
                 ascon_code = str(row.iloc[1]).strip()
 
