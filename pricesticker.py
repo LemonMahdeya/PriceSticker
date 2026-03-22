@@ -5,16 +5,16 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
 
+
 class LemonLabelGenerator:
     def __init__(self, root):
         self.root = root
         self.root.title("Lemon Sticker Maker 60x40")
         self.root.geometry("400x250")
 
-        self.label = tk.Label(root, text="Select Excel File to Generate Stickers", pady=20)
-        self.label.pack()
+        tk.Label(root, text="Select Excel File to Generate Stickers", pady=20).pack()
 
-        self.btn_select = tk.Button(
+        tk.Button(
             root,
             text="Generate Stickers (60x40mm)",
             command=self.process_file,
@@ -22,42 +22,63 @@ class LemonLabelGenerator:
             fg="white",
             padx=20,
             pady=10
-        )
-        self.btn_select.pack(pady=10)
+        ).pack(pady=10)
+
+    def safe_str(self, value):
+        """تحويل آمن إلى string بدون nan"""
+        if pd.isna(value):
+            return ""
+        return str(value).strip()
+
+    def safe_float(self, value):
+        """تحويل آمن إلى رقم"""
+        try:
+            return float(value)
+        except:
+            return 0.0
 
     def process_file(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Excel files", "*.xlsx *.xls")]
+        )
         if not file_path:
             return
 
         try:
             df = pd.read_excel(file_path).dropna(how='all')
+
+            if df.shape[1] < 5:
+                raise Exception("Excel file must have at least 5 columns")
+
             output_name = "Lemon_Stickers_Final.pdf"
 
             sw, sh = 60 * mm, 40 * mm
             c = canvas.Canvas(output_name, pagesize=(sw, sh))
 
-            for index, row in df.iterrows():
+            for _, row in df.iterrows():
+
+                # ✅ Intl Code
                 intl_code_raw = row.iloc[0]
+                try:
+                    intl_code = str(int(intl_code_raw)) if pd.notna(intl_code_raw) else ""
+                except:
+                    intl_code = ""
 
-if pd.notna(intl_code_raw):
-    intl_code = str(int(intl_code_raw))
-else:
-    intl_code = ""
-
-                ascon_code = str(row.iloc[1]).strip()
-
-                # ✅ إضافة صفر في بداية ASCON Code لو مش موجود
-                if not ascon_code.startswith("0"):
+                # ✅ ASCON Code
+                ascon_code = self.safe_str(row.iloc[1])
+                if ascon_code and not ascon_code.startswith("0"):
                     ascon_code = "0" + ascon_code
 
-                item_name = str(row.iloc[2])
-                tax_percent = float(row.iloc[3])
-                price_input = float(row.iloc[4])
+                # ✅ باقي البيانات
+                item_name = self.safe_str(row.iloc[2])
+                tax_percent = self.safe_float(row.iloc[3])
+                price_input = self.safe_float(row.iloc[4])
 
                 price_display = "{:.2f}".format(price_input)
 
-                # 1. الاسم
+                # ------------------ الرسم ------------------
+
+                # الاسم
                 c.setFont("Helvetica-Bold", 8)
                 name_lines = simpleSplit(item_name, "Helvetica-Bold", 8, sw - 12 * mm)
                 y_pos = sh - 5 * mm
@@ -65,7 +86,7 @@ else:
                     c.drawString(4 * mm, y_pos, line)
                     y_pos -= 3.2 * mm
 
-                # 2. السعر
+                # السعر
                 c.setFont("Helvetica-Bold", 32)
                 p_width = c.stringWidth(price_display, "Helvetica-Bold", 32)
                 start_x = (sw - p_width) / 2
@@ -77,17 +98,25 @@ else:
                 sr_y = sh / 2 + 1 * mm
                 c.drawString(sr_x, sr_y, "S.R")
 
-                # VAT فوق S.R
+                # VAT
                 c.setFont("Helvetica", 6)
                 c.drawString(sr_x, sr_y + 4 * mm, f"{int(tax_percent)}% VAT")
 
-                # 4. الأكواد
+                # الأكواد
                 c.setFont("Helvetica-Bold", 10)
-                c.drawCentredString(sw / 2, sh / 2 - 9 * mm, f"{intl_code}   /   {ascon_code}")
+                c.drawCentredString(
+                    sw / 2,
+                    sh / 2 - 9 * mm,
+                    f"{intl_code}   /   {ascon_code}"
+                )
 
-                # 5. التذييل
+                # الفوتر
                 c.setFont("Helvetica-Bold", 8)
-                c.drawCentredString(sw / 2, 6 * mm, "Lemon pharmacy Group       www.lemon.sa")
+                c.drawCentredString(
+                    sw / 2,
+                    6 * mm,
+                    "Lemon pharmacy Group       www.lemon.sa"
+                )
 
                 c.showPage()
 
