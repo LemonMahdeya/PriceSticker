@@ -1,133 +1,72 @@
-import pandas as pd
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
-from reportlab.lib.utils import simpleSplit
+import os
+import sys
+import win32print
+import win32ui
+from PIL import Image, ImageWin, ImageDraw, ImageFont
 
+def print_fridge_label():
+    try:
+        # 1. إعدادات المسار (للتوافق مع ملف EXE)
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(__file__)
+        
+        image_path = os.path.join(base_path, "snow.png")
 
-class LemonLabelGenerator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Lemon Sticker Maker 60x40")
-        self.root.geometry("400x250")
-
-        tk.Label(root, text="Select Excel File to Generate Stickers", pady=20).pack()
-
-        tk.Button(
-            root,
-            text="Generate Stickers (60x40mm)",
-            command=self.process_file,
-            bg="#2ecc71",
-            fg="white",
-            padx=20,
-            pady=10
-        ).pack(pady=10)
-
-    def safe_str(self, value):
-        """تحويل آمن إلى string بدون nan"""
-        if pd.isna(value):
-            return ""
-        return str(value).strip()
-
-    def safe_float(self, value):
-        """تحويل آمن إلى رقم"""
-        try:
-            return float(value)
-        except:
-            return 0.0
-
-    def process_file(self):
-        file_path = filedialog.askopenfilename(
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
-        if not file_path:
+        if not os.path.exists(image_path):
+            print("خطأ: لم يتم العثور على صورة snow.png في المجلد")
             return
 
+        # 2. إعدادات الورقة (80mm تقريباً تعادل 575 بكسل بـ 203 DPI)
+        width = 575 
+        height = 600 # طول مرن حسب الحاجة
+        img = Image.new('RGB', (width, height), color=(255, 255, 255))
+        draw = ImageDraw.Draw(img)
+
+        # 3. كتابة النص FRIDGE ITEM
+        # ملاحظة: يمكنك تحميل خط عريض إذا أردت، هنا نستخدم الخط الافتراضي
         try:
-            df = pd.read_excel(file_path).dropna(how='all')
+            font = ImageFont.truetype("arial.ttf", 60)
+        except:
+            font = ImageFont.load_default()
 
-            if df.shape[1] < 5:
-                raise Exception("Excel file must have at least 5 columns")
+        text = "FRIDGE ITEM"
+        # توسيط النص
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        draw.text(((width - text_width) // 2, 40), text, fill=(0, 0, 0), font=font)
 
-            output_name = "Lemon_Stickers_Final.pdf"
+        # 4. إضافة صورة الثلج وتكبيرها
+        snow_img = Image.open(image_path).convert("RGBA")
+        # جعل عرض الصورة 400 بكسل مع الحفاظ على التناسب
+        ratio = 400 / float(snow_img.size[0])
+        new_height = int(float(snow_img.size[1]) * float(ratio))
+        snow_img = snow_img.resize((400, new_height), Image.Resampling.LANCZOS)
+        
+        # دمج صورة الثلج في منتصف الورقة
+        img.paste(snow_img, ((width - 400) // 2, 150), snow_img)
 
-            sw, sh = 60 * mm, 40 * mm
-            c = canvas.Canvas(output_name, pagesize=(sw, sh))
+        # 5. إرسال الأمر للطابعة الافتراضية
+        printer_name = win32print.GetDefaultPrinter()
+        hDC = win32ui.CreateDC()
+        hDC.CreatePrinterDC(printer_name)
+        
+        hDC.StartDoc("Fridge Label")
+        hDC.StartPage()
 
-            for _, row in df.iterrows():
+        dib = ImageWin.Dib(img)
+        dib.draw(hDC.GetHandleOutput(), (0, 0, width, height))
 
-                # ✅ Intl Code
-                intl_code_raw = row.iloc[0]
-                try:
-                    intl_code = str(int(intl_code_raw)) if pd.notna(intl_code_raw) else ""
-                except:
-                    intl_code = ""
+        hDC.EndPage()
+        hDC.EndDoc()
+        hDC.DeleteDC()
+        
+        print("تم إرسال الطلب للطابعة بنجاح.")
 
-                # ✅ ASCON Code
-                ascon_code = self.safe_str(row.iloc[1])
-                if ascon_code and not ascon_code.startswith("0"):
-                    ascon_code = "0" + ascon_code
-
-                # ✅ باقي البيانات
-                item_name = self.safe_str(row.iloc[2])
-                tax_percent = self.safe_float(row.iloc[3])
-                price_input = self.safe_float(row.iloc[4])
-
-                price_display = "{:.2f}".format(price_input)
-
-                # ------------------ الرسم ------------------
-
-                # الاسم
-                c.setFont("Helvetica-Bold", 8)
-                name_lines = simpleSplit(item_name, "Helvetica-Bold", 8, sw - 12 * mm)
-                y_pos = sh - 5 * mm
-                for line in name_lines[:2]:
-                    c.drawString(4 * mm, y_pos, line)
-                    y_pos -= 3.2 * mm
-
-                # السعر
-                c.setFont("Helvetica-Bold", 32)
-                p_width = c.stringWidth(price_display, "Helvetica-Bold", 32)
-                start_x = (sw - p_width) / 2
-                c.drawString(start_x - 2 * mm, sh / 2 + 1 * mm, price_display)
-
-                # S.R
-                c.setFont("Helvetica", 8)
-                sr_x = start_x + p_width + 1 * mm
-                sr_y = sh / 2 + 1 * mm
-                c.drawString(sr_x, sr_y, "S.R")
-
-                # VAT
-                c.setFont("Helvetica", 6)
-                c.drawString(sr_x, sr_y + 4 * mm, f"{int(tax_percent)}% VAT")
-
-                # الأكواد
-                c.setFont("Helvetica-Bold", 10)
-                c.drawCentredString(
-                    sw / 2,
-                    sh / 2 - 9 * mm,
-                    f"{intl_code}   /   {ascon_code}"
-                )
-
-                # الفوتر
-                c.setFont("Helvetica-Bold", 8)
-                c.drawCentredString(
-                    sw / 2,
-                    6 * mm,
-                    "Lemon pharmacy Group       www.lemon.sa"
-                )
-
-                c.showPage()
-
-            c.save()
-            messagebox.showinfo("Success", "Done! Check Lemon_Stickers_Final.pdf")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Error: {str(e)}")
-
+    except Exception as e:
+        print(f"حدث خطأ: {e}")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = LemonLabelGenerator(root)
-    root.mainloop()
+    print_fridge_label()
+    # البرنامج سيغلق تلقائياً بعد انتهاء الوظيفة
